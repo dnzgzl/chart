@@ -1,4 +1,3 @@
-'''
 function createPeriodsRawData(lines){
     var periodsData = [];
     for(var i = 0; i < 6; i++){
@@ -226,5 +225,3 @@ $(document).ready(function(){
 
 afterReady();
 });
-
-'''
