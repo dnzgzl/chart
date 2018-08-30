@@ -29,9 +29,10 @@ var chartData = {};
 function csvToArray(data){
     console.log("Data: ", data);
     var lines = data.split(/\r?\n|\r/);
-    var teams = lines[0].split(';'); 
+    var teams = lines[0].split(';').filter((teamname) => teamname != '');
     var categories = lines[1].split(';');
-    
+    categories = categories.slice(0, categories.length/teams.length);
+
     var periodsData = createPeriodsRawData(lines);
     console.log(periodsData);
     var periods = createPeriods(periodsData, teams, categories);
@@ -47,19 +48,14 @@ function csvToArray(data){
 
 function createTeamColors(){
     var colors = [
-        'rgba(255,0,0,1)',
-        'rgba(0,255,0,1)',
-        'rgba(0,0,255,1)',
-        'rgba(255,255,0,1)',
-        'rgba(0,255,255,1)',
-        'rgba(255,0,255,1)'
+        '255,0,0',
+        '0,255,0',
+        '0,0,255',
+        '255,255,0',
+        '0,255,255',
+        '255,0,255'
     ]
-    var teamColors = {};
-    for(var i = 0; i < chartData.teams.length; i++){
-        var team = chartData.teams[i];
-        teamColors[team] = colors[i];
-    }
-    return teamColors;
+    return colors;
 }
 
 function createBubbleChartData(periodCount, xAxis, yAxis, radius){
@@ -68,7 +64,7 @@ function createBubbleChartData(periodCount, xAxis, yAxis, radius){
     };
 
     var teamColors = createTeamColors();
-
+    var teamIndex = 0;
     for(var team of chartData.teams){
         var teamData = []
         for(var periodIndex = 0; periodIndex < periodCount; periodIndex++){
@@ -82,11 +78,11 @@ function createBubbleChartData(periodCount, xAxis, yAxis, radius){
 
         bubbleChartData.datasets.push({
             label: team,
-            backgroundColor: teamColors[team],
             borderWidth: 2,
-            borderColor: 'rgba(255,255,255,1)',
+            borderColor: 'rgba(' + teamColors[teamIndex] + ',1)',
             data: teamData
         });
+        teamIndex++;
     }
 
     return bubbleChartData;
@@ -99,7 +95,20 @@ function periodTitle(index){
 
 
 function createChartOptions(periodCount, xAxis, yAxis, radius){
+    var teamColors = createTeamColors();
+
     return {
+        elements: {
+            labelColor: function(context){
+                return 'rgba(255,0,0,1)';
+            },
+            point: {
+                backgroundColor: function(context){
+                    var color = 'rgba('+ teamColors[context.datasetIndex] + ',' + (context.dataIndex + 1)/periodCount + ')';
+                    return color;
+                }
+            }
+        },
         responsive: true,
         showLines: true,
         title: {
@@ -130,8 +139,8 @@ function createChartOptions(periodCount, xAxis, yAxis, radius){
             }]
         },
         animation: {
-            duration: 4000,
-            easing: 'linear',
+            duration: 1000,
+            easing: 'easeInOutQuad',
         },
         layout: {
             padding: {
@@ -160,9 +169,12 @@ function drawChart(bubbleChartData, periodCount, xAxis, yAxis, radius){
             options: createChartOptions(periodCount, xAxis, yAxis, radius)
         });
     } else {
-        myChart.data = bubbleChartData;
+        for(var i = 0; i < myChart.data.datasets.length; i++){
+            myChart.data.datasets[i].data = bubbleChartData.datasets[i].data;
+        }
+        //myChart.data = bubbleChartData;
         myChart.options = createChartOptions(periodCount, xAxis, yAxis, radius);
-        myChart.update(0);
+        myChart.update();
     }
     
 }
@@ -211,7 +223,7 @@ function updateOptions(){
 }
 
 function afterReady (data){
-    csvToArray(data);//'Team 1;Team 2;Team 3;Team 4\nWerbungskosten;Absatz;Gewinn;Umsatz;F&E;Marketing\n100;30;240;340;50;25;150;25;300;450;10;20;50;25;200;250;30;40;20;75;450;470;15;35\n200;60;360;560;100;50;200;70;600;800;30;40;100;45;350;450;60;80;50;100;500;550;30;70\n150;25;200;350;150;75;100;40;200;300;50;60;230;35;450;680;90;120;200;20;250;450;45;105\n100;50;300;400;200;100;120;60;400;520;70;80;100;20;200;300;120;160;10;30;250;260;60;140\n250;70;300;550;250;125;170;80;350;520;90;100;50;100;450;500;150;200;80;150;750;830;75;175\n100;100;400;500;300;150;80;200;500;580;110;120;20;50;350;370;180;240;10;40;300;310;90;210');
+    csvToArray(data);
     updateOptions();
     updateChart();
 }
@@ -223,5 +235,4 @@ $(document).ready(function(){
         contentType: "charset=utf-8",
     }).done(afterReady);
 
-afterReady();
 });
