@@ -4,7 +4,7 @@ function createPeriodsRawData(lines){
         var numberData = lines[i + 2].split(';').map((value) => parseInt(value));
         periodsData.push(numberData);
     }
-    
+
     return periodsData;
 }
 
@@ -29,21 +29,21 @@ var chartData = {};
 function csvToArray(data){
     console.log("Data: ", data);
     var lines = data.split(/\r?\n|\r/);
-    var teams = lines[0].split(';').filter((teamname) => teamname != '');
+    var teams = lines[0].split(';').filter((teamname) => teamname != ''); //Splittet Reihe 0, sprich Reihe 1 in csv file in die 4 Namen
     var categories = lines[1].split(';');
     categories = categories.slice(0, categories.length/teams.length);
 
     var periodsData = createPeriodsRawData(lines);
     console.log(periodsData);
     var periods = createPeriods(periodsData, teams, categories);
-    
+
     chartData.teams = teams;
     chartData.categories = categories;
     chartData.periods = periods;
-    console.log(teams);
-    console.log(categories);
-    console.log(periods);
-    console.log(chartData);
+    console.log("Teams: ",teams);
+    console.log("Categories: ",categories);
+    console.log("Periods: ",periods);
+    console.log("chartData: ",chartData);
 }
 
 function createTeamColors(){
@@ -57,8 +57,81 @@ function createTeamColors(){
     ]
     return colors;
 }
+function reduceAxis(periodCount, axis, fun, initialValue){
+    var result = initialValue;
+    for(var periodIndex = 0; periodIndex < periodCount; periodIndex++){
+        var period = chartData.periods[periodIndex];
+        for(var team of chartData.teams){
+            result = fun(result, period[team][axis]);
+        }
+    }
+    return result;
+}
 
-function createBubbleChartData(periodCount, xAxis, yAxis, radius){
+function regressionOverall(x, periodCount, xAxis, yAxis){
+    var sumX = reduceAxis(periodCount, xAxis, (a, b) => a + b, 0);
+    var sumY = reduceAxis(periodCount, yAxis, (a, b) => a + b, 0);
+    var sumXSquared = reduceAxis(periodCount, xAxis, (a, b) => a + Math.pow(b, 2), 0);
+
+    var axisMultiplication = 0;
+    for(var periodIndex = 0; periodIndex < periodCount; periodIndex++){
+        var period = chartData.periods[periodIndex];
+        for(var team of chartData.teams){
+            axisMultiplication += period[team][xAxis] * period[team][yAxis];
+        }
+    }
+
+    var n = periodCount * chartData.teams.length;
+    var a = (sumXSquared*sumY - sumX*axisMultiplication) / (n * sumXSquared - Math.pow(sumX, 2));
+    var b = (n * axisMultiplication - sumX*sumY) / (n * sumXSquared - Math.pow(sumX, 2));
+    return a + b * x;
+}
+
+function regressionOverall(x, periodCount, xAxis, yAxis){
+    var sumX = reduceAxis(periodCount, xAxis, (a, b) => a + b, 0);
+    var sumY = reduceAxis(periodCount, yAxis, (a, b) => a + b, 0);
+    var sumXSquared = reduceAxis(periodCount, xAxis, (a, b) => a + Math.pow(b, 2), 0);
+
+    var axisMultiplication = 0;
+    for(var periodIndex = 0; periodIndex < periodCount; periodIndex++){
+        var period = chartData.periods[periodIndex];
+        for(var team of chartData.teams){
+            axisMultiplication += period[team][xAxis] * period[team][yAxis];
+        }
+    }
+
+    var n = periodCount * chartData.teams.length;
+    var a = (sumXSquared*sumY - sumX*axisMultiplication) / (n * sumXSquared - Math.pow(sumX, 2));
+    var b = (n * axisMultiplication - sumX*sumY) / (n * sumXSquared - Math.pow(sumX, 2));
+    return a + b * x;
+}
+
+function addRegressionToData(bubbleChartData, periodCount, xAxis, yAxis){
+    var minX = 0;
+    var regressionStart = regressionOverall(minX, periodCount, xAxis, yAxis);
+    var maxX = 0;
+
+    for(var periodIndex = 0; periodIndex < periodCount; periodIndex++){
+        var period = chartData.periods[periodIndex];
+        for(var team of chartData.teams){
+            var newMax = period[team][xAxis];
+            maxX = newMax > maxX ? newMax : maxX;
+        }
+    }
+
+    var regressionEnd = regressionOverall(maxX, periodCount, xAxis, yAxis);
+
+    bubbleChartData.datasets.push({
+        label: 'Regression',
+        data: [{x: minX, y: regressionStart}, {x: maxX, y: regressionEnd}],
+        type: 'line',
+        backgroundColor: 'rgba(50, 50, 50, 1)',
+        borderColor: 'rgba(50, 50, 50, 1)',
+        fill: false,
+        pointRadius: 0
+    });
+}
+function createBubbleChartData(periodCount, xAxis, yAxis, radius, regression){
     var bubbleChartData = {
         datasets: []
     };
@@ -83,6 +156,10 @@ function createBubbleChartData(periodCount, xAxis, yAxis, radius){
             data: teamData
         });
         teamIndex++;
+    }
+
+    if(regression){
+        addRegressionToData(bubbleChartData, periodCount, xAxis, yAxis);
     }
 
     return bubbleChartData;
@@ -169,14 +246,22 @@ function drawChart(bubbleChartData, periodCount, xAxis, yAxis, radius){
             options: createChartOptions(periodCount, xAxis, yAxis, radius)
         });
     } else {
+        //Make sure new and old data has the same length
+        while(myChart.data.datasets.length > bubbleChartData.datasets.length){
+            myChart.data.datasets.pop();
+        }
+        while(myChart.data.datasets.length < bubbleChartData.datasets.length){
+            myChart.data.datasets.push(bubbleChartData.datasets[myChart.data.datasets.length]);
+        }
+
+        //copy the data manually because this will trigger the correct animation
         for(var i = 0; i < myChart.data.datasets.length; i++){
             myChart.data.datasets[i].data = bubbleChartData.datasets[i].data;
         }
-        //myChart.data = bubbleChartData;
         myChart.options = createChartOptions(periodCount, xAxis, yAxis, radius);
         myChart.update();
     }
-    
+
 }
 
 function selectedValue(htmlID){
@@ -190,8 +275,9 @@ function updateChart(){
     var xAxis = selectedValue('xAxis');
     var yAxis = selectedValue('yAxis');
     var radius = selectedValue('radius');
+    var regression = selectedValue('regression');
 
-    var bubbleChartData = createBubbleChartData(periodCount, xAxis, yAxis, radius);
+    var bubbleChartData = createBubbleChartData(periodCount, xAxis, yAxis, radius, regression);
     drawChart(bubbleChartData, periodCount, xAxis, yAxis, radius);
 }
 
@@ -234,5 +320,4 @@ $(document).ready(function(){
         datatype: "text",
         contentType: "charset=utf-8",
     }).done(afterReady);
-
 });
