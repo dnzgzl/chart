@@ -25,9 +25,9 @@
     <select id ="xAxis" name= "x-Achse" autofocus></select>
     
     <label for="regr">Regression:</label>
-    <select id="selectid4" name= "regression">
-        <option>an</option>
-        <option>aus</option>
+    <select id="regression" name= "regression">
+        <option value='true' onclick="updateChart()">an</option>
+        <option value='' onclick="updateChart()">aus</option>
     </select>
 
 
@@ -43,10 +43,8 @@
     <label for="anima">Animation</label>
     <select id= "animation" name= "Animation">
         <option>aus</option>
-        <option>langsam</option>
-        <option>mittel</option>
-        <option>schnell</option>
-    </select>
+        <option>an</option>
+          </select>
 
     <label for="Time">Zeit:</label>
     <select id="time" name= "zeit">
@@ -60,4 +58,4 @@
     <canvas id = "canvas" ></canvas>
 </div>
 </body>
-</html> 
+</html>
